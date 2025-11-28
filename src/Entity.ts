@@ -1,6 +1,6 @@
 // Entity.ts - Base implementation of IEntity with parent-child relationships
 
-import { IEntity, Position } from './IEntity';
+import { IEntity, Position, MouseEvent } from './IEntity';
 import { Draw } from './Draw';
 
 export class Entity implements IEntity {
@@ -13,6 +13,13 @@ export class Entity implements IEntity {
     children: IEntity[];
     parent: IEntity | null;
     debugConnectToParent: boolean;
+
+    // Mouse interaction properties
+    hasBorder: boolean = false;
+    borderColor: [number, number, number, number] = [1, 1, 1, 1]; // White border by default
+    borderWidth: number = 1;
+    highlightOnHover: boolean = false;
+    isHovered: boolean = false;
 
     constructor(id: string, x: number = 0, y: number = 0) {
         this.id = id;
@@ -60,7 +67,7 @@ export class Entity implements IEntity {
             if (child.id === id) {
                 return child;
             }
-            
+
             // Recursively search in grandchildren
             const found = child.findChild(id);
             if (found) {
@@ -93,11 +100,11 @@ export class Entity implements IEntity {
 
         // Calculate world position based on parent's world position
         const parentWorldPos = this.parent.getWorldPosition();
-        const rotatedX = this.position.x * Math.cos(this.parent.getWorldRotation()) - 
+        const rotatedX = this.position.x * Math.cos(this.parent.getWorldRotation()) -
                         this.position.y * Math.sin(this.parent.getWorldRotation());
-        const rotatedY = this.position.x * Math.sin(this.parent.getWorldRotation()) + 
+        const rotatedY = this.position.x * Math.sin(this.parent.getWorldRotation()) +
                         this.position.y * Math.cos(this.parent.getWorldRotation());
-        
+
         return {
             x: parentWorldPos.x + rotatedX * this.parent.scale.x,
             y: parentWorldPos.y + rotatedY * this.parent.scale.y
@@ -108,8 +115,41 @@ export class Entity implements IEntity {
         if (this.absolute || !this.parent) {
             return this.rotation;
         }
-        
+
         // Calculate world rotation based on parent's world rotation
         return this.parent.getWorldRotation() + this.rotation;
+    }
+
+    traverseEntities(callback: (entity: IEntity) => void): void {
+        console.log("Traversing entity: " + this.id);
+        callback(this);
+        for (const child of this.children) {
+            child.traverseEntities(callback);
+        }
+    }
+
+    // Mouse interaction methods
+    containsPoint(x: number, y: number): boolean {
+        // Default implementation - implement specific bounds checking in subclasses
+        // For now, return false since we don't know the exact bounds
+        return false;
+    }
+
+    onMouseEnter?(): void {
+        if (this.highlightOnHover) {
+            this.isHovered = true;
+        }
+    }
+
+    onMouseLeave?(): void {
+        this.isHovered = false;
+    }
+
+    onMouseDown?(): void {
+        // Default empty implementation that can be overridden
+    }
+
+    onMouseUp?(): void {
+        // Default empty implementation that can be overridden
     }
 }

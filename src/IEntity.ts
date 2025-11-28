@@ -8,8 +8,15 @@ export interface Position {
     y: number;
 }
 
+// Mouse event interface
+export interface MouseEvent {
+    x: number;
+    y: number;
+}
+
 // Entity interface
 export interface IEntity {
+    traverseEntities(callback: (entity: IEntity) => void): unknown;
     id: string;
     position: Position;
     rotation: number; // in radians
@@ -36,6 +43,20 @@ export interface IEntity {
     // Relationship methods
     getWorldPosition(): Position;
     getWorldRotation(): number;
+
+    // Mouse interaction methods
+    containsPoint(x: number, y: number): boolean;
+    onMouseEnter?(): void;
+    onMouseLeave?(): void;
+    onMouseDown?(): void;
+    onMouseUp?(): void;
+
+    // Visual properties
+    hasBorder: boolean;
+    borderColor: [number, number, number, number];
+    borderWidth: number;
+    highlightOnHover: boolean;
+    isHovered: boolean;
 
     // Debugging
     debugConnectToParent: boolean; // flag to enable debug line to parent

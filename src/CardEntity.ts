@@ -56,6 +56,11 @@ export class CardEntity extends Entity {
         this.currentColor = [...this.color]; // Copy of the color
         this.effects = [];
         this.effectStartTime = 0;
+
+        // Enable border and hover effects for cards
+        this.hasBorder = true;
+        this.highlightOnHover = true;
+        this.borderColor = [1, 1, 1, 1]; // White border by default
     }
 
     update(deltaTime: number): void {
@@ -77,25 +82,38 @@ export class CardEntity extends Entity {
     }
 
     draw(draw: Draw): void {
+        // Determine base color based on hover state
+        let cardColor: [number, number, number, number] = this.currentColor;
+        if (this.isHovered) {
+            // Brighten the color when hovered
+            cardColor = [
+                Math.min(1, this.currentColor[0] * 1.5),
+                Math.min(1, this.currentColor[1] * 1.5),
+                Math.min(1, this.currentColor[2] * 1.5),
+                this.currentColor[3]
+            ] as [number, number, number, number];
+        }
+
         // Draw the card as a rectangle
         draw.box({
             x: this.position.x - this.width / 2,
             y: this.position.y - this.height / 2,
             width: this.width,
             height: this.height,
-            color: this.currentColor,
+            color: cardColor,
             fill: true
         });
 
-        // Draw border
+        // Draw border - use specific border color when hovered, otherwise black
+        const borderColor: [number, number, number, number] = this.isHovered ? this.borderColor : [0, 0, 0, 1];
         draw.box({
             x: this.position.x - this.width / 2,
             y: this.position.y - this.height / 2,
             width: this.width,
             height: this.height,
-            color: [0, 0, 0, 1], // Black border
+            color: borderColor,
             fill: false,
-            lineWidth: 2
+            lineWidth: this.isHovered ? 3 : 2
         });
     }
 
@@ -116,5 +134,15 @@ export class CardEntity extends Entity {
     onMouseOut(): void {
         // Add a color shift effect when mouse leaves the card
         this.addEffect(new ColorShiftEffect(0.5, [0.2, 0.6, 1, 1])); // Back to original color in 0.5 seconds
+    }
+
+    containsPoint(x: number, y: number): boolean {
+        // Check if the point is within the card's bounding box
+        const left = this.position.x - this.width / 2;
+        const right = this.position.x + this.width / 2;
+        const top = this.position.y - this.height / 2;
+        const bottom = this.position.y + this.height / 2;
+
+        return x >= left && x <= right && y >= top && y <= bottom;
     }
 }
