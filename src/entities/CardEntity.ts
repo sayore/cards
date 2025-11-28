@@ -1,4 +1,4 @@
-// CardEntity.ts - Example entity demonstrating the effect system
+// CardEntity.ts
 
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
@@ -19,7 +19,7 @@ export class ColorShiftEffect implements IEffect {
     constructor(duration: number, targetColor: [number, number, number, number]) {
         this.duration = duration;
         this.activeTime = 0;
-        this.originalColor = [1, 1, 1, 1]; // Default white
+        this.originalColor = [1, 1, 1, 1];
         this.targetColor = targetColor;
     }
 
@@ -29,7 +29,6 @@ export class ColorShiftEffect implements IEffect {
     }
 
     apply(entity: CardEntity): void {
-        // This effect modifies the color over time
         const progress = Math.min(this.activeTime / this.duration, 1);
         entity.currentColor = [
             this.originalColor[0] + (this.targetColor[0] - this.originalColor[0]) * progress,
@@ -43,24 +42,36 @@ export class ColorShiftEffect implements IEffect {
 export class CardEntity extends Entity {
     width: number;
     height: number;
+    
+    // Identity
+    title: string;
+    description: string;
+
+    // Rendering State
     color: [number, number, number, number];
     currentColor: [number, number, number, number];
     effects: IEffect[];
-    private effectStartTime: number;
+    
+    // Texture Caching
+    private cachedTexture: WebGLTexture | null = null;
+    private isDirty: boolean = true;
+    private readonly SCALE_FACTOR = 2; // 2x resolution for crisp text
 
-    constructor(id: string, x: number, y: number, width: number = 80, height: number = 100) {
+    constructor(id: string, x: number, y: number, title: string = "Card", desc: string = "No description") {
         super(id, x, y);
-        this.width = width;
-        this.height = height;
-        this.color = [0.2, 0.6, 1, 1]; // Default blueish color
-        this.currentColor = [...this.color]; // Copy of the color
-        this.effects = [];
-        this.effectStartTime = 0;
+        this.width = 120;
+        this.height = 160;
+        
+        this.title = title;
+        this.description = desc;
 
-        // Enable border and hover effects for cards
+        this.color = [0.2, 0.6, 1, 1]; // Default base tint
+        this.currentColor = [...this.color];
+        this.effects = [];
+
         this.hasBorder = true;
         this.highlightOnHover = true;
-        this.borderColor = [1, 1, 1, 1]; // White border by default
+        this.borderColor = [1, 1, 1, 1];
     }
 
     update(deltaTime: number): void {
@@ -70,47 +81,141 @@ export class CardEntity extends Entity {
         for (let i = this.effects.length - 1; i >= 0; i--) {
             const effect = this.effects[i];
             if (!effect.update(deltaTime)) {
-                // Effect has expired
                 this.effects.splice(i, 1);
-                // Reset to original color when effect ends
-                this.currentColor = [...this.color];
+                // When effects end, snap back to base color (or logic to revert)
+                if (this.effects.length === 0) {
+                     this.currentColor = [...this.color];
+                }
             } else {
-                // Apply the effect
                 effect.apply(this);
             }
         }
     }
 
+    /**
+     * Helper to wrap text within a specific width on the Canvas
+     */
+    private wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
+        const words = text.split(' ');
+        let line = '';
+
+        for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                ctx.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += lineHeight;
+            }
+            else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, x, y);
+    }
+
+    /**
+     * Bakes the card layout to a texture.
+     * We bake the background as WHITE so we can tint it later using currentColor.
+     */
+    private bakeTexture(gl: WebGLRenderingContext): void {
+        const canvas = document.createElement('canvas');
+        const sf = this.SCALE_FACTOR;
+        
+        const w = this.width * sf;
+        const h = this.height * sf;
+        canvas.width = w;
+        canvas.height = h;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // 1. Draw Background (White, to allow Tinting via shader)
+        ctx.fillStyle = "#FFFFFF"; 
+        ctx.fillRect(0, 0, w, h);
+
+        // 2. Draw Placeholder Image Box (Dark Gray)
+        ctx.fillStyle = "#333333";
+        ctx.fillRect(5 * sf, 20 * sf, w - (10 * sf), h * 0.35);
+
+        // 3. Draw Title
+        ctx.fillStyle = "#000000";
+        ctx.font = `bold ${16 * sf}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(this.title, w / 2, 5 * sf);
+
+        // 4. Draw Description
+        ctx.fillStyle = "#222222";
+        ctx.font = `${10 * sf}px Arial`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        
+        const padding = 4 * sf;
+        const descY = (h * 0.5) + padding;
+        const maxWidth = w - (padding * 2);
+        
+        this.wrapText(ctx, this.description, padding, descY-10, maxWidth, 6 * sf);
+
+        // 5. Create WebGL Texture
+        if (this.cachedTexture) gl.deleteTexture(this.cachedTexture);
+        this.cachedTexture = gl.createTexture();
+        
+        gl.bindTexture(gl.TEXTURE_2D, this.cachedTexture);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        
+        // Linear filtering for smooth downscaling
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        this.isDirty = false;
+    }
+
     draw(draw: Draw): void {
-        // Determine base color based on hover state
-        let cardColor: [number, number, number, number] = this.currentColor;
-        if (this.isHovered) {
-            // Brighten the color when hovered
-            cardColor = [
-                Math.min(1, this.currentColor[0] * 1.5),
-                Math.min(1, this.currentColor[1] * 1.5),
-                Math.min(1, this.currentColor[2] * 1.5),
-                this.currentColor[3]
-            ] as [number, number, number, number];
+        // Baking check
+        if (this.isDirty || !this.cachedTexture) {
+            // NOTE: We access the raw GL context. 
+            // Ensure your Draw class has 'gl' public or cast it to any.
+            this.bakeTexture((draw as any).gl); 
         }
 
-        // FIX: Calculate World Position and Rotation for drawing
+        // Determine Tint Color
+        let tintColor: [number, number, number, number] = this.currentColor;
+        
+        // If hovered, we brighten the tint
+        if (this.isHovered) {
+            tintColor = [
+                Math.min(1.0, this.currentColor[0] * 1.3),
+                Math.min(1.0, this.currentColor[1] * 1.3),
+                Math.min(1.0, this.currentColor[2] * 1.3),
+                this.currentColor[3]
+            ];
+        }
+
         const worldPos = this.getWorldPosition();
         const worldRot = this.getWorldRotation();
 
-        // Draw the card
-        draw.box({
-            x: worldPos.x - this.width / 2, // Use worldPos instead of this.position
-            y: worldPos.y - this.height / 2,
-            width: this.width,
-            height: this.height,
-            color: cardColor,
-            fill: true,
-            rotation: worldRot // Ensure this is passed!
-        });
+        // 1. Draw the Baked Texture
+        if (this.cachedTexture) {
+            draw.texturedBox({
+                x: worldPos.x - this.width / 2,
+                y: worldPos.y - this.height / 2,
+                width: this.width,
+                height: this.height,
+                texture: this.cachedTexture,
+                rotation: worldRot,
+                color: tintColor // This tints the white background of the texture
+            });
+        }
 
-        // ... border logic (use worldPos here too) ...
+        // 2. Draw the Dynamic Border (Immediate mode is fine for simple outlines)
         const borderColor: [number, number, number, number] = this.isHovered ? this.borderColor : [0, 0, 0, 1];
+        
+        // Note: Make sure Draw.box (filled=false) supports rotation now (from previous fix)
+        // If not, this border will not align.
         draw.box({
             x: worldPos.x - this.width / 2,
             y: worldPos.y - this.height / 2,
@@ -118,11 +223,11 @@ export class CardEntity extends Entity {
             height: this.height,
             color: borderColor,
             fill: false,
-            lineWidth: 5,
-            rotation: worldRot // Pass rotation to outline too (if supported)
+            lineWidth: this.isHovered ? 3 : 1,
+            rotation: worldRot 
         });
 
-        // Debug line to parent (Logic uses world coords, so this is fine)
+        // Debug Line
         if (this.parent) {
              const parentPos = this.parent.getWorldPosition();
              draw.line({
@@ -136,30 +241,30 @@ export class CardEntity extends Entity {
     }
 
     addEffect(effect: IEffect): void {
-        // If it's a ColorShiftEffect, set the original color
         if (effect instanceof ColorShiftEffect) {
             effect.originalColor = [...this.currentColor];
         }
         this.effects.push(effect);
     }
 
-    // Example method to trigger an effect on an event
     onMouseOver(): void {
-        // Add a color shift effect when mouse is over the card
-        this.addEffect(new ColorShiftEffect(1.0, [1, 0.5, 0.2, 1])); // Orange color for 1 second
+        // Example: Turn slightly Orange on hover via effect, or just rely on the brightness logic in draw()
+        // this.addEffect(new ColorShiftEffect(1.0, [1, 0.8, 0.5, 1])); 
     }
 
     onMouseOut(): void {
-        // Add a color shift effect when mouse leaves the card
-        this.addEffect(new ColorShiftEffect(0.5, [0.2, 0.6, 1, 1])); // Back to original color in 0.5 seconds
+        // this.addEffect(new ColorShiftEffect(0.5, this.color));
     }
 
     containsPoint(x: number, y: number): boolean {
-        // Check if the point is within the card's bounding box
-        const left = this.position.x - this.width / 2;
-        const right = this.position.x + this.width / 2;
-        const top = this.position.y - this.height / 2;
-        const bottom = this.position.y + this.height / 2;
+        // Simple AABB check - Note: This is NOT accurate for rotated cards.
+        // For accurate rotated collision, you need to transform the mouse point into local space.
+        // But for this stage, AABB is usually "good enough" for card games unless rotation is extreme.
+        const worldPos = this.getWorldPosition();
+        const left = worldPos.x - this.width / 2;
+        const right = worldPos.x + this.width / 2;
+        const top = worldPos.y - this.height / 2;
+        const bottom = worldPos.y + this.height / 2;
 
         return x >= left && x <= right && y >= top && y <= bottom;
     }

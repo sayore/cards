@@ -17,12 +17,12 @@ export class CardHand extends Entity {
         super(id, x, y);
         this.cards = [];
         this.maxCards = maxCards;
-        this.cardSpacing = 0.3; // Radians between cards
+        this.cardSpacing = 0.15; // Radians between cards
         this.arcAngle = Math.PI * 0.8; // 144 degrees arc
         this.rotation = 0;
-        this.handRadius = 150; // Radius of the arc
-        this.cardWidth = 60;
-        this.cardHeight = 80;
+        this.handRadius = 400; // Radius of the arc
+        this.cardWidth = 120;
+        this.cardHeight = 160;
     }
 
     update(deltaTime: number): void {

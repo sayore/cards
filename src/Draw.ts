@@ -445,6 +445,106 @@ export class Draw {
     if (!blendEnabled) gl.disable(gl.BLEND);
   }
 
+  // Draws a textured box with rotation support
+  texturedBox(options: BoxOptions & { texture: WebGLTexture }): void {
+    // We cannot batch textures easily without an atlas, so we flush the current batch
+    this.flush();
+
+    const gl = this.gl;
+    gl.useProgram(this.program);
+
+    // 1. Uniforms
+    gl.uniform2f(gl.getUniformLocation(this.program, "u_resolution"), gl.canvas.width, gl.canvas.height);
+    gl.uniform1f(gl.getUniformLocation(this.program, "u_useTexture"), 1.0); // 1.0 = Use Texture
+
+    // Set Tint Color (usually white to show texture as-is)
+    const c = options.color || [1, 1, 1, 1];
+    const colorLoc = gl.getAttribLocation(this.program, "a_color");
+    gl.disableVertexAttribArray(colorLoc);
+    gl.vertexAttrib4f(colorLoc, c[0], c[1], c[2], c[3]);
+
+    // Bind Texture
+    gl.bindTexture(gl.TEXTURE_2D, options.texture);
+    gl.uniform1i(gl.getUniformLocation(this.program, "u_texture"), 0);
+
+    // 2. Calculate Geometry (Copied from your fixed box logic)
+    const x = options.x;
+    const y = options.y;
+    const w = options.width;
+    const h = options.height;
+
+    // Corners (Top-Left, Top-Right, Bottom-Right, Bottom-Left)
+    let p1x = x,     p1y = y;
+    let p2x = x + w, p2y = y;
+    let p3x = x + w, p3y = y + h;
+    let p4x = x,     p4y = y + h;
+
+    // Apply Rotation
+    if (options.rotation) {
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        const cos = Math.cos(options.rotation);
+        const sin = Math.sin(options.rotation);
+
+        const rotateX = (px: number, py: number) => cx + (px - cx) * cos - (py - cy) * sin;
+        const rotateY = (px: number, py: number) => cy + (px - cx) * sin + (py - cy) * cos;
+
+        const r1x = rotateX(p1x, p1y); const r1y = rotateY(p1x, p1y);
+        const r2x = rotateX(p2x, p2y); const r2y = rotateY(p2x, p2y);
+        const r3x = rotateX(p3x, p3y); const r3y = rotateY(p3x, p3y);
+        const r4x = rotateX(p4x, p4y); const r4y = rotateY(p4x, p4y);
+
+        p1x = r1x; p1y = r1y;
+        p2x = r2x; p2y = r2y;
+        p3x = r3x; p3y = r3y;
+        p4x = r4x; p4y = r4y;
+    }
+
+    // Vertex Data: x, y, u, v
+    const vertices = new Float32Array([
+        // Triangle 1
+        p1x, p1y, 0.0, 0.0, // TL
+        p2x, p2y, 1.0, 0.0, // TR
+        p4x, p4y, 0.0, 1.0, // BL
+        
+        // Triangle 2
+        p4x, p4y, 0.0, 1.0, // BL
+        p2x, p2y, 1.0, 0.0, // TR
+        p3x, p3y, 1.0, 1.0, // BR
+    ]);
+
+    // 3. Buffer & Attributes
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    const FSIZE = 4;
+    const stride = 4 * FSIZE; // x, y, u, v
+
+    const posLoc = gl.getAttribLocation(this.program, "a_position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, stride, 0);
+
+    const texLoc = gl.getAttribLocation(this.program, "a_texCoord");
+    if (texLoc !== -1) {
+        gl.enableVertexAttribArray(texLoc);
+        gl.vertexAttribPointer(texLoc, 2, gl.FLOAT, false, stride, 2 * FSIZE);
+    }
+
+    // 4. Draw
+    const blendEnabled = gl.isEnabled(gl.BLEND);
+    if (!blendEnabled) {
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // Standard for premultiplied textures
+    }
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Cleanup
+    gl.deleteBuffer(buffer);
+    if (!blendEnabled) gl.disable(gl.BLEND);
+  }
+
   // Draw a circle
   circle(options: CircleOptions): void {
     // Circles cannot be batched with quads, flush the current batch first

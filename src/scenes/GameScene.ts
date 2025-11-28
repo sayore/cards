@@ -40,12 +40,12 @@ export class GameScene extends Entity {
     this.addChild(new FPS("FPS", 200, 10));
 
     
-    this.cardHand = new CardHand("cardhand", 400, 500, 5);
+    this.cardHand = new CardHand("cardhand", 400, 860, 5);
     this.addChild(this.cardHand);
 
     // Add some cards to the hand
     for (let i = 0; i < 3; i++) {
-      const card = new CardEntity(`card_${i}`, 0, 0, 60, 80);
+      const card = new CardEntity(`card_${i}`, 0, 0, "Herold", "No description");
       card.color = [
         0.2 + Math.random() * 0.8,
         0.3 + Math.random() * 0.7,
