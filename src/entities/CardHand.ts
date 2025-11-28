@@ -2,7 +2,7 @@
 
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
-import { CardEntity } from '../CardEntity';
+import { CardEntity } from './CardEntity';
 
 export class CardHand extends Entity {
     cards: CardEntity[];

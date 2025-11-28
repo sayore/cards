@@ -68,33 +68,41 @@ interface ImageOptions extends DrawingOptions {
 // Shader sources
 const vertexShaderSource = `
 attribute vec2 a_position;
-attribute vec2 a_texCoord; // NEW: Input UVs
+attribute vec2 a_texCoord;
+attribute vec4 a_color;     // NEW: Color is now per-vertex
+
 uniform vec2 u_resolution;
-varying vec2 v_texCoord;   // NEW: Pass UVs to fragment
+
+varying vec2 v_texCoord;
+varying vec4 v_color;       // NEW: Pass color to fragment
 
 void main() {
    vec2 zeroToOne = a_position / u_resolution;
    vec2 zeroToTwo = zeroToOne * 2.0;
    vec2 clipSpace = zeroToTwo - 1.0;
    gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
-   
-   v_texCoord = a_texCoord; // Pass to fragment
+
+   v_texCoord = a_texCoord;
+   v_color = a_color;       // Pass to fragment shader
 }
 `;
 
 const fragmentShaderSource = `
 precision mediump float;
-uniform vec4 u_color;
-uniform sampler2D u_texture; // NEW: The texture
-uniform float u_useTexture;  // NEW: 0.0 = solid color, 1.0 = texture
-varying vec2 v_texCoord;     // NEW: Receive UVs
+
+uniform sampler2D u_texture;
+uniform float u_useTexture; // 0.0 = Solid, 1.0 = Texture
+
+varying vec2 v_texCoord;
+varying vec4 v_color;       // NEW: Receive color
 
 void main() {
    if (u_useTexture > 0.5) {
-       // Multiply texture color by u_color (allows tinting, usually keep u_color white for text)
-       gl_FragColor = texture2D(u_texture, v_texCoord) * u_color;
+       // Multiply texture with vertex color (allows tinting)
+       gl_FragColor = texture2D(u_texture, v_texCoord) * v_color;
    } else {
-       gl_FragColor = u_color;
+       // Just use the vertex color
+       gl_FragColor = v_color;
    }
 }
 `;
@@ -105,10 +113,31 @@ export class Draw {
   private quadBuffer: WebGLBuffer;
   private texture: WebGLTexture | null = null;
 
+  // Batch rendering infrastructure
+  private readonly MAX_QUADS = 10000;
+  private readonly VERTEX_SIZE = 8; // x, y, u, v, r, g, b, a
+  private readonly VERTICES_PER_QUAD = 6;
+
+  private batchData: Float32Array; // The CPU array
+  private batchCounter = 0;        // How many quads are queued
+  private vertexBuffer: WebGLBuffer; // The GPU buffer
+
+  private textCache = new Map<string, WebGLTexture>();
+  private scratchCanvas = document.createElement('canvas');
+  private scratchCtx = this.scratchCanvas.getContext('2d', { willReadFrequently: true });
+
   constructor(renderer: WebGLRenderer) {
     this.gl = renderer.getContext();
     this.program = this.createShaderProgram();
     this.quadBuffer = this.createQuadBuffer();
+
+    // Initialize batch buffers
+    this.batchData = new Float32Array(this.MAX_QUADS * this.VERTICES_PER_QUAD * this.VERTEX_SIZE);
+
+    // Create a Dynamic Buffer (intended for frequent updates)
+    this.vertexBuffer = this.gl.createBuffer()!;
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.batchData.byteLength, this.gl.DYNAMIC_DRAW);
   }
 
   private createShaderProgram(): WebGLProgram {
@@ -193,14 +222,20 @@ export class Draw {
 
   // Draw a line
   line(options: LineOptions): void {
+    this.flush();
+
     const gl = this.gl;
     gl.useProgram(this.program);
 
     gl.uniform2f(gl.getUniformLocation(this.program, "u_resolution"), gl.canvas.width, gl.canvas.height);
     gl.uniform1f(gl.getUniformLocation(this.program, "u_useTexture"), 0.0);
 
+    // --- FIX START ---
     const color = options.color || [1, 1, 1, 1];
-    gl.uniform4f(gl.getUniformLocation(this.program, "u_color"), color[0], color[1], color[2], color[3]);
+    const colorLoc = gl.getAttribLocation(this.program, "a_color");
+    gl.disableVertexAttribArray(colorLoc);
+    gl.vertexAttrib4f(colorLoc, color[0], color[1], color[2], color[3]);
+    // --- FIX END ---
 
     const vertices = new Float32Array([
         options.x1, options.y1,
@@ -211,99 +246,131 @@ export class Draw {
     gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-    // Position
     const positionLoc = gl.getAttribLocation(this.program, "a_position");
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // Dummy Texture Coords (Fix)
     const texCoordLoc = gl.getAttribLocation(this.program, "a_texCoord");
     if (texCoordLoc !== -1) {
-        gl.enableVertexAttribArray(texCoordLoc);
-        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
+        gl.disableVertexAttribArray(texCoordLoc);
     }
 
     gl.lineWidth(options.lineWidth || 1);
     gl.drawArrays(gl.LINES, 0, 2);
 
     gl.deleteBuffer(lineBuffer);
-}
+  }
 
   // Draw a rectangle/box
-  // Draw a rectangle/box
-box(options: BoxOptions): void {
+  box(options: BoxOptions): void {
+    // Fallback for outlines (cannot batch efficiently with filled quads)
+    if (options.fill === false) {
+      this.flush(); // Draw whatever is queued first
+      this.drawImmediateOutline(options); // You'll need to move your old 'line_loop' logic here
+      return;
+    }
+
+    // Check if batch is full
+    if (this.batchCounter >= this.MAX_QUADS) {
+      this.flush();
+    }
+
+    const x = options.x;
+    const y = options.y;
+    const w = options.width;
+    const h = options.height;
+    const c = options.color || [1, 1, 1, 1];
+
+    let index = this.batchCounter * this.VERTICES_PER_QUAD * this.VERTEX_SIZE;
+    const d = this.batchData;
+
+    // Push 6 Vertices (2 Triangles)
+    // Format: x, y, u, v, r, g, b, a
+
+    // Top-Left
+    d[index++] = x;     d[index++] = y;     d[index++] = 0; d[index++] = 0;
+    d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
+
+    // Top-Right
+    d[index++] = x + w; d[index++] = y;     d[index++] = 1; d[index++] = 0;
+    d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
+
+    // Bottom-Left
+    d[index++] = x;     d[index++] = y + h; d[index++] = 0; d[index++] = 1;
+    d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
+
+    // Bottom-Left (Repeated)
+    d[index++] = x;     d[index++] = y + h; d[index++] = 0; d[index++] = 1;
+    d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
+
+    // Top-Right (Repeated)
+    d[index++] = x + w; d[index++] = y;     d[index++] = 1; d[index++] = 0;
+    d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
+
+    // Bottom-Right
+    d[index++] = x + w; d[index++] = y + h; d[index++] = 1; d[index++] = 1;
+    d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
+
+    this.batchCounter++;
+  }
+
+  private drawImmediateOutline(options: BoxOptions): void {
     const gl = this.gl;
     gl.useProgram(this.program);
 
-    // 1. Uniforms
     gl.uniform2f(gl.getUniformLocation(this.program, "u_resolution"), gl.canvas.width, gl.canvas.height);
     gl.uniform1f(gl.getUniformLocation(this.program, "u_useTexture"), 0.0); // Solid color
 
+    // --- FIX START ---
     const color = options.color || [1, 1, 1, 1];
-    gl.uniform4f(gl.getUniformLocation(this.program, "u_color"), color[0], color[1], color[2], color[3]);
+    const colorLoc = gl.getAttribLocation(this.program, "a_color");
+    gl.disableVertexAttribArray(colorLoc); // Stop reading from buffer
+    gl.vertexAttrib4f(colorLoc, color[0], color[1], color[2], color[3]); // Set constant color
+    // --- FIX END ---
 
-    // 2. Create Vertices based on Fill mode
+    // 2. Create Vertices
     const x1 = options.x;
     const y1 = options.y;
     const x2 = options.x + options.width;
     const y2 = options.y + options.height;
 
-    let vertices: Float32Array;
-    let mode: number;
+    const vertices = new Float32Array([
+        x1, y1,  x2, y1,  x2, y2,  x1, y2
+    ]);
 
-    if (options.fill) {
-        mode = gl.TRIANGLES;
-        // 2 Triangles (6 vertices)
-        vertices = new Float32Array([
-            x1, y1,  x2, y1,  x1, y2,
-            x1, y2,  x2, y1,  x2, y2,
-        ]);
-    } else {
-        mode = gl.LINE_LOOP;
-        // 4 Vertices for outline
-        vertices = new Float32Array([
-            x1, y1,  x2, y1,  x2, y2,  x1, y2
-        ]);
-    }
-
-    // 3. Buffer Setup
     const rectBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, rectBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
-    // 4. Attributes
-    // Position Attribute
     const positionLoc = gl.getAttribLocation(this.program, "a_position");
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // Texture Attribute (THE FIX)
-    // Even though we aren't using textures, we MUST satisfy the attribute 
-    // to prevent crashes/invisibility on some GPUs. 
-    // We just point it to the same position buffer.
+    // Texture Attribute FIX
     const texCoordLoc = gl.getAttribLocation(this.program, "a_texCoord");
     if (texCoordLoc !== -1) {
-        gl.enableVertexAttribArray(texCoordLoc);
-        gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 0, 0);
+        // Must be disabled for outline drawing as we have no UV data in buffer
+        gl.disableVertexAttribArray(texCoordLoc); 
     }
 
-    // 5. Blending (Ensure transparency works for boxes too)
     const blendEnabled = gl.isEnabled(gl.BLEND);
     if (!blendEnabled) {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     }
 
-    gl.drawArrays(mode, 0, vertices.length / 2);
+    gl.lineWidth(options.lineWidth || 1);
+    gl.drawArrays(gl.LINE_LOOP, 0, vertices.length / 2);
 
-    // Cleanup
     gl.deleteBuffer(rectBuffer);
     if (!blendEnabled) gl.disable(gl.BLEND);
-}
+  }
 
   // Draw a circle
-  // Draw a circle
-circle(options: CircleOptions): void {
+  circle(options: CircleOptions): void {
+    // Circles cannot be batched with quads, flush the current batch first
+    this.flush();
+
     const gl = this.gl;
     gl.useProgram(this.program);
 
@@ -393,6 +460,9 @@ circle(options: CircleOptions): void {
 
   // Draw an image
   image(options: ImageOptions): void {
+    // Images cannot be reliably batched due to async loading, flush the current batch first
+    this.flush();
+
     if (!options.src && !options.imageData) {
       console.warn("Image drawing requires either src or imageData");
       return;
@@ -482,6 +552,9 @@ circle(options: CircleOptions): void {
     height: number,
     texture: WebGLTexture
   ): void {
+    // Textured quads can't be easily batched with other textures, so flush first
+    this.flush();
+
     const gl = this.gl;
     gl.useProgram(this.program);
 
@@ -489,13 +562,16 @@ circle(options: CircleOptions): void {
     const resolutionLoc = gl.getUniformLocation(this.program, "u_resolution");
     gl.uniform2f(resolutionLoc, gl.canvas.width, gl.canvas.height);
 
-    // NEW: Tell shader to use texture mode
     const useTexLoc = gl.getUniformLocation(this.program, "u_useTexture");
     gl.uniform1f(useTexLoc, 1.0); // 1.0 = Use Texture
 
-    // NEW: Reset color to White (so we don't tint the existing text color)
-    const colorLoc = gl.getUniformLocation(this.program, "u_color");
-    gl.uniform4f(colorLoc, 1, 1, 1, 1);
+    // --- FIX START ---
+    // The shader expects a_color attribute. We aren't providing a buffer for it here.
+    // So we disable the array and set a constant value (White) for all vertices.
+    const colorLoc = gl.getAttribLocation(this.program, "a_color");
+    gl.disableVertexAttribArray(colorLoc); // Stop reading from buffer
+    gl.vertexAttrib4f(colorLoc, 1, 1, 1, 1); // Constant White
+    // --- FIX END ---
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
     const texLoc = gl.getUniformLocation(this.program, "u_texture");
@@ -508,30 +584,12 @@ circle(options: CircleOptions): void {
     const y2 = y + height;
 
     const vertices = new Float32Array([
-      x1,
-      y1,
-      0.0,
-      0.0,
-      x2,
-      y1,
-      1.0,
-      0.0,
-      x1,
-      y2,
-      0.0,
-      1.0,
-      x1,
-      y2,
-      0.0,
-      1.0,
-      x2,
-      y1,
-      1.0,
-      0.0,
-      x2,
-      y2,
-      1.0,
-      1.0,
+      x1, y1, 0.0, 0.0,
+      x2, y1, 1.0, 0.0,
+      x1, y2, 0.0, 1.0,
+      x1, y2, 0.0, 1.0,
+      x2, y1, 1.0, 0.0,
+      x2, y2, 1.0, 1.0,
     ]);
 
     const buffer = gl.createBuffer();
@@ -548,14 +606,7 @@ circle(options: CircleOptions): void {
     const texCoordLoc = gl.getAttribLocation(this.program, "a_texCoord");
     if (texCoordLoc !== -1) {
       gl.enableVertexAttribArray(texCoordLoc);
-      gl.vertexAttribPointer(
-        texCoordLoc,
-        2,
-        gl.FLOAT,
-        false,
-        stride,
-        2 * FSIZE
-      );
+      gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, stride, 2 * FSIZE);
     }
 
     // 3. Enable Blending
@@ -565,96 +616,111 @@ circle(options: CircleOptions): void {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     gl.deleteBuffer(buffer);
-    // Clean up attribute state to prevent other shapes from breaking
+    
+    // Cleanup: Disable texture coord to avoid leaks
     if (texCoordLoc !== -1) gl.disableVertexAttribArray(texCoordLoc);
   }
 
-  // Text rendering method
-  // Text rendering method
-text(options: TextOptions): void {
+  private getCachedTextTexture(options: TextOptions): WebGLTexture | null {
     const gl = this.gl;
+    if (!this.scratchCtx) return null;
 
-    // 1. Create canvas & context
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    // 1. Generate a unique key for this specific text configuration
+    // (Include text, font, size, and color so different styles are cached separately)
+    const colorStr = options.color ? options.color.join(',') : 'default';
+    const key = `${options.text}-${options.fontFamily}-${options.fontSize}-${colorStr}`;
 
-    // 2. Setup Font & Measure
-    // We use a multiplier for height to safely fit descenders (g, j, y) and accents
+    // 2. Check Cache
+    if (this.textCache.has(key)) {
+      return this.textCache.get(key)!;
+    }
+
+    // 3. Cache Miss - Draw to Scratch Canvas
+    const ctx = this.scratchCtx;
     const fontSize = options.fontSize || 16;
     const fontStr = `${fontSize}px ${options.fontFamily || "Arial"}`;
-    
-    // Set font to measure accurate width
+
     ctx.font = fontStr;
     const textMetrics = ctx.measureText(options.text);
+    const width = Math.ceil(textMetrics.width + 10);
+    const height = Math.ceil(fontSize * 1.4);
+
+    // Resize scratch canvas (only if needed to grow, optimization)
+    if (this.scratchCanvas.width < width) this.scratchCanvas.width = width;
+    if (this.scratchCanvas.height < height) this.scratchCanvas.height = height;
     
-    // Calculate dimensions
-    const width = Math.ceil(textMetrics.width + 10); // +10 padding
-    const height = Math.ceil(fontSize * 1.4);        // 1.4x factor ensures fit
-
-    // 3. Resize canvas (THIS RESETS CONTEXT STATE!)
-    canvas.width = width;
-    canvas.height = height;
-
-    // 4. Re-apply Settings & Draw
-    ctx.font = fontStr;
-    ctx.textAlign = options.textAlign || "left";
-    // Using 'middle' is much safer for vertical alignment in textures
-    ctx.textBaseline = "middle"; 
-
-    // Clear (Transparency)
+    // Clear area we will use
     ctx.clearRect(0, 0, width, height);
 
-    // Color: Convert WebGL [0-1] to Canvas [0-255]
-    const color = options.color || [1, 1, 1, 1];
-    ctx.fillStyle = `rgba(${Math.floor(color[0] * 255)}, ${Math.floor(color[1] * 255)}, ${Math.floor(color[2] * 255)}, ${color[3]})`;
-
-    // Draw Text centered vertically
-    // If textAlign is 'center', x should be width/2, but usually we just draw at 5px padding for left-aligned
+    // Draw Text
+    ctx.font = fontStr;
+    ctx.textAlign = "left"; // Always draw left-aligned in texture
+    ctx.textBaseline = "middle";
+    
+    // Parse color
+    const c = options.color || [1, 1, 1, 1];
+    ctx.fillStyle = `rgba(${Math.floor(c[0]*255)}, ${Math.floor(c[1]*255)}, ${Math.floor(c[2]*255)}, ${c[3]})`;
+    
     ctx.fillText(options.text, 5, height / 2);
 
-    // 5. WebGL Texture Upload
+    // 4. Create WebGL Texture
     const texture = gl.createTexture();
-    if (!texture) return;
+    if (!texture) return null;
 
     gl.bindTexture(gl.TEXTURE_2D, texture);
-
-    // IMPORTANT: Handle Alpha correctly for HTML Canvases
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+    
+    // Upload ONLY the part of the canvas we used
+    // (Optimization: getting ImageData is expensive, but safer than uploading huge canvas)
+    const imageData = ctx.getImageData(0, 0, width, height);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageData);
 
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    // 6. Handle Blending & Depth
-    const blendEnabled = gl.isEnabled(gl.BLEND);
-    const depthMaskEnabled = gl.getParameter(gl.DEPTH_WRITEMASK);
-
-    if (!blendEnabled) gl.enable(gl.BLEND);
-
-    // FIX FOR BLACK BOX: 
-    // 1. Use ONE, ONE_MINUS_SRC_ALPHA because we used PREMULTIPLY_ALPHA above
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    // 5. Store in Cache
+    this.textCache.set(key, texture);
     
-    // 2. Disable Depth Mask. 
-    // If we don't do this, transparent pixels write to the Z-buffer, 
-    // blocking the background from drawing if it's drawn later, or creating artifacts.
-    gl.depthMask(false);
+    // Optional: Add a cleanup mechanism if cache grows too big
+    if (this.textCache.size > 1000) {
+        // Simple eviction: clear everything if too big
+        // A real game would use an LRU cache
+        this.clearTextCache();
+    }
 
-    // 7. Draw
+    return texture;
+  }
+
+  // Call this when changing levels
+  public clearTextCache() {
+      const gl = this.gl;
+      this.textCache.forEach(texture => gl.deleteTexture(texture));
+      this.textCache.clear();
+  }
+
+  // Text rendering method
+  text(options: TextOptions): void {
+    // 1. Get Texture (Cached or New)
+    const texture = this.getCachedTextTexture(options);
+    if (!texture) return;
+
+    // 2. Calculate dimensions for the Quad (must match what we drew in cache)
+    // We need to re-measure briefly to know how big the quad should be on screen
+    if (!this.scratchCtx) return;
+    this.scratchCtx.font = `${options.fontSize || 16}px ${options.fontFamily || "Arial"}`;
+    const metrics = this.scratchCtx.measureText(options.text);
+    
+    const width = Math.ceil(metrics.width + 10);
+    const height = Math.ceil((options.fontSize || 16) * 1.4);
+
+    // 3. Draw
+    // Note: This still breaks the batch because it switches texture.
+    // But we avoided the massive cost of creating a texture.
     this.drawImageQuad(options.x, options.y, width, height, texture);
-
-    // 8. Restore State
-    gl.depthMask(depthMaskEnabled); // Restore depth writing
-    if (!blendEnabled) gl.disable(gl.BLEND);
     
-    // Reset blend func to standard if needed (optional, depends on your engine)
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); 
-
-    // Cleanup
-    gl.deleteTexture(texture);
-}
+    // DO NOT delete texture here! It lives in the cache now.
+  }
 
   // Method to create a prerendered buffer that can be drawn later
   createBuffer(width: number, height: number): WebGLFramebuffer {
@@ -783,5 +849,62 @@ text(options: TextOptions): void {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return texture;
+  }
+
+  // Call this at the start of the render loop
+  begin(): void {
+      this.batchCounter = 0;
+  }
+
+  // Call this at the end of the render loop
+  end(): void {
+      this.flush();
+  }
+
+  private flush(): void {
+      if (this.batchCounter === 0) return;
+
+      const gl = this.gl;
+      gl.useProgram(this.program);
+
+      // 1. Uniforms
+      gl.uniform2f(gl.getUniformLocation(this.program, "u_resolution"), gl.canvas.width, gl.canvas.height);
+      // For now, flush handles solid shapes.
+      // (If mixing textures, you'd need to flush before changing textures)
+      gl.uniform1f(gl.getUniformLocation(this.program, "u_useTexture"), 0.0);
+
+      // 2. Upload Data
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+      const view = this.batchData.subarray(0, this.batchCounter * this.VERTICES_PER_QUAD * this.VERTEX_SIZE);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, view);
+
+      // 3. Attributes
+      const FSIZE = 4;
+      const stride = this.VERTEX_SIZE * FSIZE;
+
+      // Position (Offset 0)
+      const posLoc = gl.getAttribLocation(this.program, "a_position");
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, stride, 0);
+
+      // TexCoord (Offset 2)
+      const texLoc = gl.getAttribLocation(this.program, "a_texCoord");
+      if (texLoc !== -1) {
+          gl.enableVertexAttribArray(texLoc);
+          gl.vertexAttribPointer(texLoc, 2, gl.FLOAT, false, stride, 2 * FSIZE);
+      }
+
+      // Color (Offset 4)
+      const colLoc = gl.getAttribLocation(this.program, "a_color");
+      gl.enableVertexAttribArray(colLoc);
+      gl.vertexAttribPointer(colLoc, 4, gl.FLOAT, false, stride, 4 * FSIZE);
+
+      // 4. Draw
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      gl.drawArrays(gl.TRIANGLES, 0, this.batchCounter * this.VERTICES_PER_QUAD);
+
+      this.batchCounter = 0;
   }
 }

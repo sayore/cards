@@ -1,7 +1,7 @@
 // CardEntity.ts - Example entity demonstrating the effect system
 
-import { Entity } from './Entity';
-import { Draw } from './Draw';
+import { Entity } from '../Entity';
+import { Draw } from '../Draw';
 
 export interface IEffect {
     duration: number; // in seconds
@@ -114,6 +114,13 @@ export class CardEntity extends Entity {
             color: borderColor,
             fill: false,
             lineWidth: this.isHovered ? 3 : 2
+        });
+
+        draw.line({
+          x1: this.position.x,
+          y1: this.position.y,
+          x2: this.parent?.position.x ?? 0,
+          y2: this.parent?.position.y ?? 0
         });
     }
 

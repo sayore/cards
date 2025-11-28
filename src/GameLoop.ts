@@ -387,6 +387,9 @@ export class GameLoop {
         // Clear the renderer
         this.renderer.clear();
 
+        // Begin batching operations
+        this.draw.begin();
+
         // Update all entities
         this.updateEntities(deltaTime / 1000);
 
@@ -395,6 +398,9 @@ export class GameLoop {
 
         // Draw debug overlay
         this.drawDebugOverlay();
+
+        // End batching and flush remaining operations
+        this.draw.end();
 
         // Request next frame
         requestAnimationFrame(this.gameLoop);

@@ -4,6 +4,7 @@ import { IEntity } from '../IEntity';
 import { Draw } from '../Draw';
 import { Entity } from '../Entity';
 import { Circle } from '../entities/Circle';
+import { FPS } from '../entities/FPS';
 
 export class SimpleScene extends Entity {
     private testBox: Entity;
@@ -19,6 +20,8 @@ export class SimpleScene extends Entity {
 
         this.testCircle = new Circle('testCircle', 400, 300); // Center of 800x600 canvas
         this.addChild(this.testCircle);
+
+        this.addChild(new FPS("FPS", 200, 10));
     }
 
     update(deltaTime: number): void {

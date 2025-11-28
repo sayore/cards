@@ -5,10 +5,11 @@ import { Draw } from '../Draw';
 import { Player } from '../entities/Player';
 import { HealthBar } from '../entities/HealthBar';
 import { CardHand } from '../entities/CardHand';
-import { CardEntity } from '../CardEntity';
+import { CardEntity } from '../entities/CardEntity';
 import { Dialog } from '../entities/Dialog';
 import { Menu } from '../entities/Menu';
 import { Background } from '../entities/Background';
+import { FPS } from '../entities/FPS';
 
 export class BackgroundScene extends Entity {
     private background: Background;
@@ -61,6 +62,8 @@ export class BackgroundScene extends Entity {
         this.menu.addItem('quit', 'Quit to Main', () => console.log('Quitting'));
         this.menu.visible = false; // Hidden by default
         this.addChild(this.menu);
+
+        this.addChild(new FPS("FPS", 200, 10));
         
         // Set up event listeners for this scene
         this.setupEventListeners();
