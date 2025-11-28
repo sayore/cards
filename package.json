@@ -1,0 +1,26 @@
+{
+  "name": "cards",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "dev-ts": "tsc --watch",
+    "start": "npx serve .",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4"
+  },
+  "dependencies": {
+    "serve": "^14.2.5"
+  }
+}
