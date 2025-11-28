@@ -94,34 +94,45 @@ export class CardEntity extends Entity {
             ] as [number, number, number, number];
         }
 
-        // Draw the card as a rectangle
+        // FIX: Calculate World Position and Rotation for drawing
+        const worldPos = this.getWorldPosition();
+        const worldRot = this.getWorldRotation();
+
+        // Draw the card
         draw.box({
-            x: this.position.x - this.width / 2,
-            y: this.position.y - this.height / 2,
+            x: worldPos.x - this.width / 2, // Use worldPos instead of this.position
+            y: worldPos.y - this.height / 2,
             width: this.width,
             height: this.height,
             color: cardColor,
-            fill: true
+            fill: true,
+            rotation: worldRot // Ensure this is passed!
         });
 
-        // Draw border - use specific border color when hovered, otherwise black
+        // ... border logic (use worldPos here too) ...
         const borderColor: [number, number, number, number] = this.isHovered ? this.borderColor : [0, 0, 0, 1];
         draw.box({
-            x: this.position.x - this.width / 2,
-            y: this.position.y - this.height / 2,
+            x: worldPos.x - this.width / 2,
+            y: worldPos.y - this.height / 2,
             width: this.width,
             height: this.height,
             color: borderColor,
             fill: false,
-            lineWidth: this.isHovered ? 3 : 2
+            lineWidth: 5,
+            rotation: worldRot // Pass rotation to outline too (if supported)
         });
 
-        draw.line({
-          x1: this.position.x,
-          y1: this.position.y,
-          x2: this.parent?.position.x ?? 0,
-          y2: this.parent?.position.y ?? 0
-        });
+        // Debug line to parent (Logic uses world coords, so this is fine)
+        if (this.parent) {
+             const parentPos = this.parent.getWorldPosition();
+             draw.line({
+                 x1: worldPos.x,
+                 y1: worldPos.y,
+                 x2: parentPos.x,
+                 y2: parentPos.y,
+                 color: [1,1,1,0.2]
+             });
+        }
     }
 
     addEffect(effect: IEffect): void {

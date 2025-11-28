@@ -262,11 +262,14 @@ export class Draw {
   }
 
   // Draw a rectangle/box
+  // Draw.ts
+
+  // Draw a rectangle/box
   box(options: BoxOptions): void {
     // Fallback for outlines (cannot batch efficiently with filled quads)
     if (options.fill === false) {
-      this.flush(); // Draw whatever is queued first
-      this.drawImmediateOutline(options); // You'll need to move your old 'line_loop' logic here
+      this.flush(); 
+      this.drawImmediateOutline(options);
       return;
     }
 
@@ -275,40 +278,81 @@ export class Draw {
       this.flush();
     }
 
+    const c = options.color || [1, 1, 1, 1];
+
+    // 1. Calculate the 4 corners (unrotated)
+    // We assume options.x/y is Top-Left
     const x = options.x;
     const y = options.y;
     const w = options.width;
     const h = options.height;
-    const c = options.color || [1, 1, 1, 1];
+
+    let tlX = x;
+    let tlY = y;
+    let trX = x + w;
+    let trY = y;
+    let blX = x;
+    let blY = y + h;
+    let brX = x + w;
+    let brY = y + h;
+
+    // 2. Apply Rotation (if exists)
+    if (options.rotation) {
+        // Rotate around the center of the box
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        const cos = Math.cos(options.rotation);
+        const sin = Math.sin(options.rotation);
+
+        // Helper to rotate a point (px, py) around (cx, cy)
+        const rotateX = (px: number, py: number) => cx + (px - cx) * cos - (py - cy) * sin;
+        const rotateY = (px: number, py: number) => cy + (px - cx) * sin + (py - cy) * cos;
+
+        // Rotate all 4 corners
+        const n_tlX = rotateX(tlX, tlY);
+        const n_tlY = rotateY(tlX, tlY);
+        const n_trX = rotateX(trX, trY);
+        const n_trY = rotateY(trX, trY);
+        const n_blX = rotateX(blX, blY);
+        const n_blY = rotateY(blX, blY);
+        const n_brX = rotateX(brX, brY);
+        const n_brY = rotateY(brX, brY);
+
+        // Reassign
+        tlX = n_tlX; tlY = n_tlY;
+        trX = n_trX; trY = n_trY;
+        blX = n_blX; blY = n_blY;
+        brX = n_brX; brY = n_brY;
+    }
 
     let index = this.batchCounter * this.VERTICES_PER_QUAD * this.VERTEX_SIZE;
     const d = this.batchData;
 
-    // Push 6 Vertices (2 Triangles)
+    // 3. Push Vertices to Batch
     // Format: x, y, u, v, r, g, b, a
 
     // Top-Left
-    d[index++] = x;     d[index++] = y;     d[index++] = 0; d[index++] = 0;
+    d[index++] = tlX;   d[index++] = tlY;   d[index++] = 0; d[index++] = 0;
     d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
 
     // Top-Right
-    d[index++] = x + w; d[index++] = y;     d[index++] = 1; d[index++] = 0;
+    d[index++] = trX;   d[index++] = trY;   d[index++] = 1; d[index++] = 0;
     d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
 
     // Bottom-Left
-    d[index++] = x;     d[index++] = y + h; d[index++] = 0; d[index++] = 1;
+    d[index++] = blX;   d[index++] = blY;   d[index++] = 0; d[index++] = 1;
     d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
 
     // Bottom-Left (Repeated)
-    d[index++] = x;     d[index++] = y + h; d[index++] = 0; d[index++] = 1;
+    d[index++] = blX;   d[index++] = blY;   d[index++] = 0; d[index++] = 1;
     d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
 
     // Top-Right (Repeated)
-    d[index++] = x + w; d[index++] = y;     d[index++] = 1; d[index++] = 0;
+    d[index++] = trX;   d[index++] = trY;   d[index++] = 1; d[index++] = 0;
     d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
 
     // Bottom-Right
-    d[index++] = x + w; d[index++] = y + h; d[index++] = 1; d[index++] = 1;
+    d[index++] = brX;   d[index++] = brY;   d[index++] = 1; d[index++] = 1;
     d[index++] = c[0];  d[index++] = c[1];  d[index++] = c[2]; d[index++] = c[3];
 
     this.batchCounter++;

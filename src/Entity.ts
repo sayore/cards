@@ -93,21 +93,38 @@ export class Entity implements IEntity {
     }
 
     // World position and rotation calculations
+    // World position and rotation calculations
     getWorldPosition(): Position {
         if (this.absolute || !this.parent) {
             return { x: this.position.x, y: this.position.y };
         }
 
-        // Calculate world position based on parent's world position
         const parentWorldPos = this.parent.getWorldPosition();
-        const rotatedX = this.position.x * Math.cos(this.parent.getWorldRotation()) -
-                        this.position.y * Math.sin(this.parent.getWorldRotation());
-        const rotatedY = this.position.x * Math.sin(this.parent.getWorldRotation()) +
-                        this.position.y * Math.cos(this.parent.getWorldRotation());
+        const parentWorldRotation = this.parent.getWorldRotation();
+        
+        // Use defaults if scale is missing
+        const parentScaleX = this.parent.scale?.x ?? 1;
+        const parentScaleY = this.parent.scale?.y ?? 1;
 
+        // FIXED ORDER:
+        
+        // 1. Apply Parent's Scale FIRST
+        // We stretch the local vector before rotating it
+        const scaledX = this.position.x * parentScaleX;
+        const scaledY = this.position.y * parentScaleY;
+
+        // 2. Apply Parent's Rotation SECOND
+        // Now rotate the scaled vector
+        const cos = Math.cos(parentWorldRotation);
+        const sin = Math.sin(parentWorldRotation);
+        
+        const finalX = scaledX * cos - scaledY * sin;
+        const finalY = scaledX * sin + scaledY * cos;
+
+        // 3. Add to parent's world position
         return {
-            x: parentWorldPos.x + rotatedX * this.parent.scale.x,
-            y: parentWorldPos.y + rotatedY * this.parent.scale.y
+            x: parentWorldPos.x + finalX,
+            y: parentWorldPos.y + finalY
         };
     }
 

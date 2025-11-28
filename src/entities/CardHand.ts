@@ -19,7 +19,7 @@ export class CardHand extends Entity {
         this.maxCards = maxCards;
         this.cardSpacing = 0.3; // Radians between cards
         this.arcAngle = Math.PI * 0.8; // 144 degrees arc
-        this.rotation = -Math.PI/2;
+        this.rotation = 0;
         this.handRadius = 150; // Radius of the arc
         this.cardWidth = 60;
         this.cardHeight = 80;
@@ -46,28 +46,33 @@ export class CardHand extends Entity {
         }
     }
     
-    // Update positions of all cards to form an arc
     private updateCardPositions(): void {
         const cardCount = this.cards.length;
         if (cardCount === 0) return;
         
         // Calculate starting angle (centered)
         const totalArc = (cardCount - 1) * this.cardSpacing;
-        const startAngle = -totalArc / 2 + this.rotation; // Start angle relative to hand rotation
+        
+        // FIX 1: Do NOT add this.rotation here. 
+        // The Scene Graph will rotate the whole group based on the parent's rotation.
+        // We just define the shape of the arc locally.
+        // Assuming -PI/2 makes the arc point "Up" relative to the hand's local space.
+        const startAngle = -totalArc / 2 - Math.PI / 2; 
         
         for (let i = 0; i < cardCount; i++) {
             const angle = startAngle + i * this.cardSpacing;
             
-            // Calculate position in arc
-            const cardX = this.position.x + Math.cos(angle) * this.handRadius;
-            const cardY = this.position.y + Math.sin(angle) * this.handRadius;
+            // FIX 2: Do NOT add this.position.x/y. Use Local Coordinates (relative to 0,0).
+            const cardX = Math.cos(angle) * this.handRadius;
+            const cardY = Math.sin(angle) * this.handRadius;
             
-            // Set card position
+            // Set card position (Local)
             this.cards[i].position.x = cardX;
             this.cards[i].position.y = cardY;
             
-            // Optionally rotate card to face outward from center
-            this.cards[i].rotation = angle + Math.PI / 2; // Rotate to be perpendicular to radius
+            // Rotate card to face outward
+            // We set local rotation. Parent rotation will be added on top automatically.
+            this.cards[i].rotation = angle + Math.PI / 2; 
         }
     }
     

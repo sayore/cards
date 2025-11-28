@@ -35,23 +35,22 @@ export class GameScene extends Entity {
 
     this.addChild(new FPS("FPS", 200, 10));
 
-    // Initialize card hand at bottom
-    for (let i = 0; i < 100; i++) {
-      this.cardHand = new CardHand("cardhand", 400, 500, 5);
-      this.addChild(this.cardHand);
+    
+    this.cardHand = new CardHand("cardhand", 400, 500, 5);
+    this.addChild(this.cardHand);
 
-      // Add some cards to the hand
-      for (let i = 0; i < 3; i++) {
-        const card = new CardEntity(`card_${i}`, 0, 0, 60, 80);
-        card.color = [
-          0.2 + Math.random() * 0.8,
-          0.3 + Math.random() * 0.7,
-          0.4 + Math.random() * 0.6,
-          1,
-        ];
-        this.cardHand.addCard(card);
-      }
+    // Add some cards to the hand
+    for (let i = 0; i < 3; i++) {
+      const card = new CardEntity(`card_${i}`, 0, 0, 60, 80);
+      card.color = [
+        0.2 + Math.random() * 0.8,
+        0.3 + Math.random() * 0.7,
+        0.4 + Math.random() * 0.6,
+        1,
+      ];
+      this.cardHand.addCard(card);
     }
+    
 
     // Initialize dialog at top
     this.dialog = new Dialog("dialog", 400, 100, 500, 120);

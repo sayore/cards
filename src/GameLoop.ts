@@ -241,6 +241,7 @@ export class GameLoop {
         // Visualize entity's position if in debug mode
         if (this.debugMode) {
             const worldPos = entity.getWorldPosition();
+            const worldRot = entity.getWorldRotation();
             
             // Draw a small cross at the entity's position
             const crossSize = 5;
@@ -263,17 +264,17 @@ export class GameLoop {
             });
             
             // Draw rotation indicator if entity is rotated
-            if (entity.rotation !== 0) {
-                const endX = worldPos.x + 10 * Math.cos(entity.rotation);
-                const endY = worldPos.y + 10 * Math.sin(entity.rotation);
+            if (worldRot !== 0) {
+                const endX = worldPos.x + 20 * Math.cos(worldRot); // Increased length to 20 to see it better
+                const endY = worldPos.y + 20 * Math.sin(worldRot);
                 
                 this.draw.line({
                     x1: worldPos.x,
                     y1: worldPos.y,
                     x2: endX,
                     y2: endY,
-                    color: [0, 0, 1, 1], // Blue line for rotation
-                    lineWidth: 1
+                    color: [0, 0, 1, 1], // Blue
+                    lineWidth: 2
                 });
             }
             
