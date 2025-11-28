@@ -10,16 +10,20 @@ import { Dialog } from "../entities/Dialog";
 import { Menu } from "../entities/Menu";
 import { Circle } from "../entities/Circle";
 import { FPS } from "../entities/FPS";
+import { Background } from "../entities/Background";
 
 export class GameScene extends Entity {
   private player: Player;
   private healthBar: HealthBar;
+  private background: Background;
   cardHand
   private dialog: Dialog;
   private menu: Menu;
 
   constructor() {
     super("gameScene", 0, 0);
+
+    
 
     // Initialize player at center
     this.player = new Player("player", 400, 300);
@@ -82,6 +86,10 @@ export class GameScene extends Entity {
       
     });
     this.addChild(overlay);
+
+    this.background = new Background('background', 400, 300, 800, 600);
+    this.background.setSolidColor([0.1, 0.1, 0.3, 1]); // Slightly different blue
+    this.addChild(this.background);
 
     // Set up event listeners for this scene
     this.setupEventListeners();

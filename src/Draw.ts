@@ -362,26 +362,60 @@ export class Draw {
     const gl = this.gl;
     gl.useProgram(this.program);
 
+    // 1. Uniforms
     gl.uniform2f(gl.getUniformLocation(this.program, "u_resolution"), gl.canvas.width, gl.canvas.height);
     gl.uniform1f(gl.getUniformLocation(this.program, "u_useTexture"), 0.0); // Solid color
 
-    // --- FIX START ---
+    // Set Color (Attribute Fix)
     const color = options.color || [1, 1, 1, 1];
     const colorLoc = gl.getAttribLocation(this.program, "a_color");
-    gl.disableVertexAttribArray(colorLoc); // Stop reading from buffer
-    gl.vertexAttrib4f(colorLoc, color[0], color[1], color[2], color[3]); // Set constant color
-    // --- FIX END ---
+    gl.disableVertexAttribArray(colorLoc);
+    gl.vertexAttrib4f(colorLoc, color[0], color[1], color[2], color[3]);
 
-    // 2. Create Vertices
-    const x1 = options.x;
-    const y1 = options.y;
-    const x2 = options.x + options.width;
-    const y2 = options.y + options.height;
+    // 2. Calculate Geometry
+    const x = options.x;
+    const y = options.y;
+    const w = options.width;
+    const h = options.height;
+
+    // Define the 4 corners relative to the screen (unrotated)
+    // Order: Top-Left -> Top-Right -> Bottom-Right -> Bottom-Left
+    let p1x = x,     p1y = y;
+    let p2x = x + w, p2y = y;
+    let p3x = x + w, p3y = y + h;
+    let p4x = x,     p4y = y + h;
+
+    // 3. Apply Rotation
+    if (options.rotation) {
+        const cx = x + w / 2;
+        const cy = y + h / 2;
+        const cos = Math.cos(options.rotation);
+        const sin = Math.sin(options.rotation);
+
+        // Rotation helper
+        const rotateX = (px: number, py: number) => cx + (px - cx) * cos - (py - cy) * sin;
+        const rotateY = (px: number, py: number) => cy + (px - cx) * sin + (py - cy) * cos;
+
+        // Rotate all 4 points
+        const r1x = rotateX(p1x, p1y); const r1y = rotateY(p1x, p1y);
+        const r2x = rotateX(p2x, p2y); const r2y = rotateY(p2x, p2y);
+        const r3x = rotateX(p3x, p3y); const r3y = rotateY(p3x, p3y);
+        const r4x = rotateX(p4x, p4y); const r4y = rotateY(p4x, p4y);
+
+        p1x = r1x; p1y = r1y;
+        p2x = r2x; p2y = r2y;
+        p3x = r3x; p3y = r3y;
+        p4x = r4x; p4y = r4y;
+    }
 
     const vertices = new Float32Array([
-        x1, y1,  x2, y1,  x2, y2,  x1, y2
+        p1x, p1y,
+        p2x, p2y,
+        p3x, p3y,
+        p4x, p4y
     ]);
 
+    // 4. Buffer & Attributes
     const rectBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, rectBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -390,13 +424,13 @@ export class Draw {
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
 
-    // Texture Attribute FIX
+    // Disable TexCoord (outline has no UVs)
     const texCoordLoc = gl.getAttribLocation(this.program, "a_texCoord");
     if (texCoordLoc !== -1) {
-        // Must be disabled for outline drawing as we have no UV data in buffer
-        gl.disableVertexAttribArray(texCoordLoc); 
+        gl.disableVertexAttribArray(texCoordLoc);
     }
 
+    // 5. Draw
     const blendEnabled = gl.isEnabled(gl.BLEND);
     if (!blendEnabled) {
         gl.enable(gl.BLEND);
@@ -404,8 +438,9 @@ export class Draw {
     }
 
     gl.lineWidth(options.lineWidth || 1);
-    gl.drawArrays(gl.LINE_LOOP, 0, vertices.length / 2);
+    gl.drawArrays(gl.LINE_LOOP, 0, 4); // 4 vertices connected in a loop
 
+    // Cleanup
     gl.deleteBuffer(rectBuffer);
     if (!blendEnabled) gl.disable(gl.BLEND);
   }
