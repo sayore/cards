@@ -6,7 +6,7 @@ import { SimpleScene } from './scenes/SimpleScene';
 import { GameScene } from './scenes/GameScene';
 import { BackgroundScene } from './scenes/BackgroundScene';
 
-export type SceneType = 'simple' | 'game' | 'background' | 'menu';
+export type SceneType = 'collision' | 'simple' | 'game' | 'background' | 'menu';
 
 export class SceneManager {
     private gameLoop: GameLoop;

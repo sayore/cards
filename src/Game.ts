@@ -31,11 +31,13 @@ export class Game {
         // Scene switching
         document.addEventListener('keydown', (e) => {
             if (e.key === '1') {
-                this.sceneManager.loadScene('simple');
+              this.sceneManager.loadScene('collision');
             } else if (e.key === '2') {
-                this.sceneManager.loadScene('game');
+              this.sceneManager.loadScene('simple');
             } else if (e.key === '3') {
-                this.sceneManager.loadScene('background');
+              this.sceneManager.loadScene('game');
+            } else if (e.key === '4') {
+              this.sceneManager.loadScene('background');
             }
         });
     }
