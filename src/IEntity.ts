@@ -17,6 +17,7 @@ export interface MouseEvent {
 // Entity interface
 export interface IEntity {
     traverseEntities(callback: (entity: IEntity) => void): unknown;
+    kind : string;
     id: string;
     position: Position;
     rotation: number; // in radians

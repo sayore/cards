@@ -5,6 +5,7 @@ import { Draw } from '../Draw';
 import { PrerenderOptions } from '../Draw';
 
 export class Background extends Entity {
+    readonly kind = 'Background';
     width: number;
     height: number;
     backgroundColor: [number, number, number, number];

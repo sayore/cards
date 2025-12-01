@@ -4,6 +4,7 @@ import { Entity } from '../Entity';
 import { Draw } from '../Draw';
 
 export class Dialog extends Entity {
+    readonly kind = 'Dialog';
     text: string;
     fontSize: number;
     fontFamily: string;

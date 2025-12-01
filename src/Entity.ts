@@ -4,6 +4,7 @@ import { IEntity, Position, MouseEvent } from './IEntity';
 import { Draw } from './Draw';
 
 export class Entity implements IEntity {
+    public kind = "BaseEntity";
     id: string;
     position: Position;
     rotation: number;

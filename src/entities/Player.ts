@@ -4,6 +4,7 @@ import { Entity } from '../Entity';
 import { Draw } from '../Draw';
 
 export class Player extends Entity {
+    readonly kind = 'Player';
     speed: number;
     health: number;
     maxHealth: number;

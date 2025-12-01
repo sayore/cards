@@ -1,8 +1,8 @@
 import { Draw } from "../Draw";
 import { Entity } from "../Entity";
 
-export class FPS extends Entity {
-  readonly kind = 'FPS';
+export class EntityList extends Entity {
+  readonly kind = 'EntityList';
   draws = 0;
   elapsed = 0;
   fps = 0;
@@ -14,11 +14,8 @@ export class FPS extends Entity {
   }
 
   update(deltaTime: number): void {
-    super.update(deltaTime);
-    // Prevent division by zero
-    if (deltaTime > 0) {
-      this.fps = Math.round(1 / deltaTime);
-    }
+    
+    
   }
 
   draw(draw: Draw): void {
@@ -27,7 +24,7 @@ export class FPS extends Entity {
     draw.text({
       x: this.position.x,
       y: this.position.y,
-      text: "FPS: " + this.fps.toString(),
+      text: "Entity List: " + this.parent?.children.map((ent)=>{return ent.kind}),
       fontSize: 10,
       color: [1, 1, 1, 1],
       fontFamily: "Arial",

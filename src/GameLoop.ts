@@ -174,7 +174,7 @@ export class GameLoop {
         
         // Get positions of visible entities
         const visibleEntityPositions: { [id: string]: { x: number; y: number } } = {};
-        for (const entity of this.entities) {
+        for (const entity of this.entities[0].children) {
             if (entity.visible) {
                 const worldPos = entity.getWorldPosition();
                 visibleEntityPositions[entity.id] = { x: Math.round(worldPos.x), y: Math.round(worldPos.y) };
@@ -306,14 +306,7 @@ export class GameLoop {
         let currentY = 30;
 
         // Draw background for debug info
-        this.draw.box({
-            x: 5,
-            y: 5,
-            width: 300,
-            height: 250,
-            color: [0, 0, 0, 0.6], // Semi-transparent black background
-            fill: true
-        });
+        
 
         // Draw debug info text
         const infoLines = [
@@ -372,6 +365,14 @@ export class GameLoop {
                 }
             }
         }
+        this.draw.box({
+            x: 5,
+            y: 5,
+            width: 300,
+            height: 250,
+            color: [0, 0, 0, 0.6], // Semi-transparent black background
+            fill: true
+        });
     }
 
     // The main game loop function

@@ -13,6 +13,7 @@ import { FPS } from "../entities/FPS";
 import { Background } from "../entities/Background";
 
 export class GameScene extends Entity {
+  readonly kind = "Scene";
   private player: Player;
   private healthBar: HealthBar;
   private background: Background;
@@ -85,11 +86,11 @@ export class GameScene extends Entity {
       console.log("Entity: " + entity.id, "Parent: " + (entity.parent ? entity.parent.id : "null"), "No"+i);
       
     });
-    this.addChild(overlay);
+    //this.addChild(overlay);
 
     this.background = new Background('background', 400, 300, 800, 600);
     this.background.setSolidColor([0.1, 0.1, 0.3, 1]); // Slightly different blue
-    this.addChild(this.background);
+    //this.addChild(this.background);
 
     // Set up event listeners for this scene
     this.setupEventListeners();

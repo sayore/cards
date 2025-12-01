@@ -12,6 +12,7 @@ import { Background } from '../entities/Background';
 import { FPS } from '../entities/FPS';
 
 export class BackgroundScene extends Entity {
+    readonly kind = "Scene";
     private background: Background;
     private player: Player;
     private healthBar: HealthBar;
@@ -23,8 +24,7 @@ export class BackgroundScene extends Entity {
         super('backgroundScene', 0, 0);
         
         // Initialize background first so it's in the back
-        this.background = new Background('background', 400, 300, 800, 600);
-        this.background.setSolidColor([0.1, 0.1, 0.3, 1]); // Slightly different blue
+        this.background = new Background("aBackground")
         this.addChild(this.background);
         
         // Initialize player at center
@@ -43,7 +43,7 @@ export class BackgroundScene extends Entity {
         
         // Add some cards to the hand
         for (let i = 0; i < 3; i++) {
-            const card = new CardEntity(`card_${i}`, 0, 0, 60, 80);
+            const card = new CardEntity(`card_${i}`, 0, 0, "Eine Karte!","Beschreibung der Karte");
             card.color = [0.2 + Math.random() * 0.8, 0.3 + Math.random() * 0.7, 0.4 + Math.random() * 0.6, 1];
             this.cardHand.addCard(card);
         }
@@ -64,6 +64,8 @@ export class BackgroundScene extends Entity {
         this.addChild(this.menu);
 
         this.addChild(new FPS("FPS", 200, 10));
+        this.background = new Background('background', 400, 300, 800, 600);
+        this.background.setSolidColor([0.1, 0.1, 0.3, 1]); // Slightly different blue
         
         // Set up event listeners for this scene
         this.setupEventListeners();

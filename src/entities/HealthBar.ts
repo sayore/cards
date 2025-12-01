@@ -5,6 +5,7 @@ import { Draw } from '../Draw';
 import { Player } from './Player';
 
 export class HealthBar extends Entity {
+    readonly kind = 'HealthBar';
     targetEntity: Entity | null;
     width: number;
     height: number;

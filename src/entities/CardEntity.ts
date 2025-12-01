@@ -40,6 +40,7 @@ export class ColorShiftEffect implements IEffect {
 }
 
 export class CardEntity extends Entity {
+    readonly kind = 'CardEntity';
     width: number;
     height: number;
     

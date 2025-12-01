@@ -4,6 +4,7 @@ import { Entity } from '../Entity';
 import { Draw } from '../Draw';
 
 export class GUI extends Entity {
+    readonly kind = 'GUI';
     elements: Entity[];
     backgroundColor: [number, number, number, number];
     borderColor: [number, number, number, number];

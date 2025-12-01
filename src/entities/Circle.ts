@@ -3,6 +3,7 @@ import { Entity } from "../Entity";
 
 
 export class Circle extends Entity {
+    readonly kind = 'Circle';
     radius: number;
     
     constructor(id: string, x: number, y: number, radius: number = 30) {

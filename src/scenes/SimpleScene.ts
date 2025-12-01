@@ -7,6 +7,7 @@ import { Circle } from '../entities/Circle';
 import { FPS } from '../entities/FPS';
 
 export class SimpleScene extends Entity {
+    readonly kind = "Scene";
     private testBox: Entity;
     private testCircle: Circle;
     rotation: number = 0;

@@ -13,6 +13,7 @@ export interface MenuItem {
 }
 
 export class Menu extends Entity {
+    readonly kind = 'Menu';
     title: string;
     items: MenuItem[];
     selectedIdx: number;

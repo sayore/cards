@@ -5,6 +5,7 @@ import { Draw } from '../Draw';
 import { CardEntity } from './CardEntity';
 
 export class CardHand extends Entity {
+    readonly kind = 'CardHand';
     cards: CardEntity[];
     maxCards: number;
     cardSpacing: number;
