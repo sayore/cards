@@ -2,6 +2,7 @@
 
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
+import { GameContext } from '../GameContext';
 
 export class Player extends Entity {
     readonly kind = 'Player';
@@ -34,16 +35,17 @@ export class Player extends Entity {
         this.borderColor = [1, 1, 0, 1]; // Yellow border when hovered
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
-        
+    update(context: GameContext): void {
+        super.update(context);
+        const { deltaTime } = context;
+
         // Handle animation
         this.animationTimer += deltaTime;
         if (this.animationTimer > 0.2) { // Change frame every 0.2 seconds
             this.animationFrame = (this.animationFrame + 1) % 4;
             this.animationTimer = 0;
         }
-        
+
         // Update blink effect if active
         if (this.blinkEffect) {
             this.blinkTimer += deltaTime;
@@ -52,7 +54,7 @@ export class Player extends Entity {
                 this.blinkTimer = 0;
             }
         }
-        
+
         // Move player if moving
         if (this.isMoving) {
             switch (this.direction) {

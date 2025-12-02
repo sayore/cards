@@ -1,5 +1,6 @@
 import { AABB, QuadItem } from "./collision/CollisionSystem";
 import { Entity } from "./Entity";
+import { GameContext } from "./GameContext";
 
 export abstract class PhysicsEntity extends Entity implements QuadItem<PhysicsEntity> {
   // Interface Implementierung

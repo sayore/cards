@@ -3,6 +3,7 @@
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
 import { Player } from './Player';
+import { GameContext } from '../GameContext';
 
 export class HealthBar extends Entity {
     readonly kind = 'HealthBar';
@@ -34,8 +35,9 @@ export class HealthBar extends Entity {
         this.debugConnectToParent = true;
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
+    update(context: GameContext): void {
+        super.update(context);
+        const { deltaTime } = context;
 
         // Update position to follow target entity (only if not a child of the target)
         if (this.targetEntity && this.parent !== this.targetEntity) {

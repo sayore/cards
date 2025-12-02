@@ -2,6 +2,7 @@
 
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
+import { GameContext } from '../GameContext';
 
 export class GUI extends Entity {
     readonly kind = 'GUI';
@@ -20,12 +21,12 @@ export class GUI extends Entity {
         this.debugConnectToParent = true;
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
-        
+    update(context: GameContext): void {
+        super.update(context);
+
         // Update all GUI elements
         for (const element of this.elements) {
-            element.update(deltaTime);
+            element.update(context);
         }
     }
 

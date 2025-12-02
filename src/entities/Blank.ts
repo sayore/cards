@@ -1,5 +1,6 @@
 import { Draw } from "../Draw";
 import { Entity } from "../Entity";
+import { GameContext } from "../GameContext";
 
 export class Blank extends Entity {
     readonly kind = 'Entity';
@@ -7,8 +8,8 @@ export class Blank extends Entity {
         super(id, x, y);
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
+    update(context: GameContext): void {
+        super.update(context);
     }
 
     draw(draw: Draw): void {

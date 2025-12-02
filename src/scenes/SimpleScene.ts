@@ -5,6 +5,7 @@ import { Draw } from '../Draw';
 import { Entity } from '../Entity';
 import { Circle } from '../entities/Circle';
 import { FPS } from '../entities/FPS';
+import { GameContext } from '../GameContext';
 
 export class SimpleScene extends Entity {
     readonly kind = "Scene";
@@ -25,16 +26,32 @@ export class SimpleScene extends Entity {
         this.addChild(new FPS("FPS", 200, 10));
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
-        
+    update(context: GameContext): void {
+        super.update(context);
+
+        const { deltaTime } = context;
+
         // Slowly rotate the test box
         this.rotation += deltaTime * 0.5; // Rotate at 0.5 radians per second
-        
+
         // Make the test box move in a circle to make it more visible
         const radius = 50;
         this.testBox.position.x = 400 + Math.cos(this.rotation) * radius;
         this.testBox.position.y = 300 + Math.sin(this.rotation) * radius;
+
+        // Example of using the context - checking for input
+        if (context.input.isKeyPressed('ArrowUp')) {
+            this.testBox.position.y -= 100 * deltaTime; // Move up
+        }
+        if (context.input.isKeyPressed('ArrowDown')) {
+            this.testBox.position.y += 100 * deltaTime; // Move down
+        }
+        if (context.input.isKeyPressed('ArrowLeft')) {
+            this.testBox.position.x -= 100 * deltaTime; // Move left
+        }
+        if (context.input.isKeyPressed('ArrowRight')) {
+            this.testBox.position.x += 100 * deltaTime; // Move right
+        }
     }
 
     draw(draw: Draw): void {

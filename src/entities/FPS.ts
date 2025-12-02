@@ -1,5 +1,6 @@
 import { Draw } from "../Draw";
 import { Entity } from "../Entity";
+import { GameContext } from "../GameContext";
 
 export class FPS extends Entity {
   readonly kind = 'FPS';
@@ -13,11 +14,12 @@ export class FPS extends Entity {
     this.position.y = y;
   }
 
-  update(deltaTime: number): void {
-    super.update(deltaTime);
+  update(context: GameContext): void {
+    super.update(context);
+    const { deltaTime } = context;
     // Prevent division by zero
     if (deltaTime > 0) {
-      this.fps = Math.round(1 / deltaTime);
+      this.fps = Math.round(1 / context.deltaTime);
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
+import { GameContext } from '../GameContext';
 
 export class Dialog extends Entity {
     readonly kind = 'Dialog';
@@ -59,22 +60,23 @@ export class Dialog extends Entity {
         this.highlightOnHover = false;  // Don't highlight by default but can be enabled
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
-        
+    update(context: GameContext): void {
+        super.update(context);
+        const { deltaTime } = context;
+
         // Handle typing effect
         if (this.isTyping && this.typingEffect) {
             this.typingTimer += deltaTime;
             const charsToAdd = Math.floor(this.typingSpeed * this.typingTimer);
-            
+
             if (charsToAdd > 0) {
                 this.visibleCharCount = Math.min(
-                    this.visibleCharCount + charsToAdd, 
+                    this.visibleCharCount + charsToAdd,
                     this.fullText.length
                 );
                 this.currentText = this.fullText.substring(0, this.visibleCharCount);
                 this.typingTimer = 0; // Reset timer
-                
+
                 // Check if typing is complete
                 if (this.visibleCharCount >= this.fullText.length) {
                     this.isTyping = false;

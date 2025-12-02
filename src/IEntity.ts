@@ -2,6 +2,7 @@
 
 import { AABB } from './collision/PrimitiveChecks';
 import { Draw } from './Draw';
+import { GameContext } from './GameContext';
 
 // Position interface
 export interface Position {
@@ -29,7 +30,7 @@ export interface IEntity {
     parent: IEntity | null;
 
     // Entity methods
-    update(deltaTime: number): void;
+    update(context: GameContext): void;
     draw(draw: Draw): void;
 
     // Entity management methods

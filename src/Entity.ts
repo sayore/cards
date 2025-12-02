@@ -3,6 +3,7 @@
 import { IEntity, Position, MouseEvent } from './IEntity';
 import { Draw } from './Draw';
 import { AABB } from './collision/PrimitiveChecks';
+import { GameContext } from './GameContext';
 
 export class Entity implements IEntity {
     public kind = "BaseEntity";
@@ -37,7 +38,7 @@ export class Entity implements IEntity {
   
 
     // IEntity methods
-    update(deltaTime: number): void {
+    update(context: GameContext): void {
         // Base implementation - can be overridden by subclasses
     }
 

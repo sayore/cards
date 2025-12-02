@@ -2,6 +2,7 @@
 
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
+import { GameContext } from '../GameContext';
 
 export interface MenuItem {
     id: string;
@@ -53,9 +54,9 @@ export class Menu extends Entity {
         this.lastSelectionTime = 0;
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
-        
+    update(context: GameContext): void {
+        super.update(context);
+
         // Update positions of menu items based on current selection
         this.updateItemPositions();
     }

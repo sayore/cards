@@ -10,6 +10,7 @@ import { Dialog } from '../entities/Dialog';
 import { Menu } from '../entities/Menu';
 import { Background } from '../entities/Background';
 import { FPS } from '../entities/FPS';
+import { GameContext } from '../GameContext';
 
 export class BackgroundScene extends Entity {
     readonly kind = "Scene";
@@ -126,8 +127,8 @@ export class BackgroundScene extends Entity {
         });
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
+    update(context: GameContext): void {
+        super.update(context);
     }
 
     draw(draw: Draw): void {

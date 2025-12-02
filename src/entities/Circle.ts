@@ -1,5 +1,6 @@
 import { Draw } from "../Draw";
 import { Entity } from "../Entity";
+import { GameContext } from "../GameContext";
 
 
 export class Circle extends Entity {
@@ -12,9 +13,8 @@ export class Circle extends Entity {
         this.radius = radius;
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
-
+    update(context: GameContext): void {
+        super.update(context);
     }
 
     draw(draw: Draw): void {

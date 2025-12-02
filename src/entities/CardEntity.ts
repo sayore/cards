@@ -2,11 +2,12 @@
 
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
+import { GameContext } from '../GameContext';
 
 export interface IEffect {
     duration: number; // in seconds
     activeTime: number; // time effect has been active
-    update(deltaTime: number): boolean; // returns true if effect is still active
+    update(context: GameContext): boolean; // returns true if effect is still active
     apply(entity: CardEntity): void;
 }
 
@@ -23,8 +24,8 @@ export class ColorShiftEffect implements IEffect {
         this.targetColor = targetColor;
     }
 
-    update(deltaTime: number): boolean {
-        this.activeTime += deltaTime;
+    update(context: GameContext): boolean {
+        this.activeTime += context.deltaTime;
         return this.activeTime < this.duration;
     }
 
@@ -75,13 +76,13 @@ export class CardEntity extends Entity {
         this.borderColor = [1, 1, 1, 1];
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
+    update(context: GameContext): void {
+        super.update(context);
 
         // Update all active effects
         for (let i = this.effects.length - 1; i >= 0; i--) {
             const effect = this.effects[i];
-            if (!effect.update(deltaTime)) {
+            if (!effect.update(context)) {
                 this.effects.splice(i, 1);
                 // When effects end, snap back to base color (or logic to revert)
                 if (this.effects.length === 0) {

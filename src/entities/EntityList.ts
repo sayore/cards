@@ -1,5 +1,6 @@
 import { Draw } from "../Draw";
 import { Entity } from "../Entity";
+import { GameContext } from "../GameContext";
 
 export class EntityList extends Entity {
   readonly kind = 'EntityList';
@@ -13,9 +14,9 @@ export class EntityList extends Entity {
     this.position.y = y;
   }
 
-  update(deltaTime: number): void {
-    
-    
+  update(context: GameContext): void {
+
+
   }
 
   draw(draw: Draw): void {

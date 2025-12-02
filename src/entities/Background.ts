@@ -3,6 +3,7 @@
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
 import { PrerenderOptions } from '../Draw';
+import { GameContext } from '../GameContext';
 
 export class Background extends Entity {
     readonly kind = 'Background';
@@ -27,8 +28,8 @@ export class Background extends Entity {
         this.drawInstance = null;
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
+    update(context: GameContext): void {
+        super.update(context);
         // Background typically doesn't need per-frame updates
     }
 

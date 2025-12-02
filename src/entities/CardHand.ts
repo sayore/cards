@@ -3,6 +3,7 @@
 import { Entity } from '../Entity';
 import { Draw } from '../Draw';
 import { CardEntity } from './CardEntity';
+import { GameContext } from '../GameContext';
 
 export class CardHand extends Entity {
     readonly kind = 'CardHand';
@@ -26,14 +27,14 @@ export class CardHand extends Entity {
         this.cardHeight = 160;
     }
 
-    update(deltaTime: number): void {
-        super.update(deltaTime);
-        
+    update(context: GameContext): void {
+        super.update(context);
+
         // Update all cards
         for (const card of this.cards) {
-            card.update(deltaTime);
+            card.update(context);
         }
-        
+
         // Update card positions to form an arc
         this.updateCardPositions();
     }

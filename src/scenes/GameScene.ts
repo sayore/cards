@@ -11,6 +11,7 @@ import { Menu } from "../entities/Menu";
 import { Circle } from "../entities/Circle";
 import { FPS } from "../entities/FPS";
 import { Background } from "../entities/Background";
+import { GameContext } from "../GameContext";
 
 export class GameScene extends Entity {
   readonly kind = "Scene";
@@ -157,8 +158,8 @@ export class GameScene extends Entity {
     });
   }
 
-  update(deltaTime: number): void {
-    super.update(deltaTime);
+  update(context: GameContext): void {
+    super.update(context);
   }
 
   draw(draw: Draw): void {

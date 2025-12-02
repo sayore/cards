@@ -3,6 +3,10 @@
 import { IEntity } from './IEntity';
 import { Draw, TextOptions } from './Draw';
 import { WebGLRenderer } from './WebGL';
+import { GameContext } from './GameContext';
+import { InputManager } from './InputManager';
+import { PhysicsSystem, AABB } from './collision/CollisionSystem';
+import { Camera } from './Camera';
 
 export class GameLoop {
     private entities: IEntity[] = [];
@@ -12,9 +16,14 @@ export class GameLoop {
     private isRunning: boolean = false;
     private debugMode: boolean = true; // Enable debug visualization by default
     private debugInfo: { [key: string]: any } = {};
-    private keyStates: { [key: string]: boolean } = {};
     private currentMode: string = 'game';
-    
+
+    // Game Context Systems
+    private input: InputManager;
+    private physics: PhysicsSystem;
+    private camera: Camera;
+    private totalTime: number = 0;
+
     // Mouse interaction properties
     private mousePosition: { x: number; y: number; } = { x: 0, y: 0 };
     private lastHovered: IEntity | null = null;
@@ -23,22 +32,22 @@ export class GameLoop {
     constructor(renderer: WebGLRenderer, draw: Draw) {
         this.renderer = renderer;
         this.draw = draw;
-        
+
+        // Initialize game systems
+        this.input = new InputManager();
+        this.physics = new PhysicsSystem({ minX: 0, minY: 0, maxX: 800, maxY: 600 }); // Example bounds
+        this.camera = new Camera();
+
+        // Set canvas for input manager
+        this.input.setCanvas(this.renderer.canvas);
+
         // Set up event listeners
         this.setupKeyListeners();
         this.setupMouseListeners();
     }
 
     private setupKeyListeners(): void {
-        document.addEventListener('keydown', (e) => {
-            this.keyStates[e.key] = true;
-            this.debugInfo['lastKeyPressed'] = e.key;
-            this.debugInfo['lastKeyTime'] = new Date().toLocaleTimeString();
-        });
-
-        document.addEventListener('keyup', (e) => {
-            this.keyStates[e.key] = false;
-        });
+        // Keyboard events are now handled by InputManager
     }
 
     private setupMouseListeners(): void {
@@ -167,17 +176,20 @@ export class GameLoop {
     updateDebugInfo(): void {
         // Update debug info about entities
         this.debugInfo['entityCount'] = this.entities.length;
-        this.debugInfo['activeKeys'] = Object.keys(this.keyStates).filter(key => this.keyStates[key]);
+        // Get active keys from the input manager
+        this.debugInfo['activeKeys'] = this.input ? this.input.getPressedKeys() : [];
         this.debugInfo['currentMode'] = this.currentMode;
         this.debugInfo['mouseX'] = this.mousePosition.x;
         this.debugInfo['mouseY'] = this.mousePosition.y;
-        
+
         // Get positions of visible entities
         const visibleEntityPositions: { [id: string]: { x: number; y: number } } = {};
-        for (const entity of this.entities[0].children) {
-            if (entity.visible) {
-                const worldPos = entity.getWorldPosition();
-                visibleEntityPositions[entity.id] = { x: Math.round(worldPos.x), y: Math.round(worldPos.y) };
+        if (this.entities[0] && this.entities[0].children) {
+            for (const entity of this.entities[0].children) {
+                if (entity.visible) {
+                    const worldPos = entity.getWorldPosition();
+                    visibleEntityPositions[entity.id] = { x: Math.round(worldPos.x), y: Math.round(worldPos.y) };
+                }
             }
         }
         this.debugInfo['entityPositions'] = visibleEntityPositions;
@@ -185,21 +197,32 @@ export class GameLoop {
 
     // Update all entities in the game world
     private updateEntities(deltaTime: number): void {
+        this.totalTime += deltaTime;
+
+        // Create game context for this frame
+        const context: GameContext = {
+            deltaTime: deltaTime,
+            totalTime: this.totalTime,
+            input: this.input,
+            physics: this.physics,
+            camera: this.camera
+        };
+
         for (const entity of this.entities) {
-            this.updateEntity(entity, deltaTime);
+            this.updateEntity(entity, context);
         }
     }
 
     // Recursively update an entity and its children
-    private updateEntity(entity: IEntity, deltaTime: number): void {
+    private updateEntity(entity: IEntity, context: GameContext): void {
         if (!entity.visible) return;
 
         // Update the entity itself
-        entity.update(deltaTime);
+        entity.update(context);
 
         // Update all children
         for (const child of entity.children) {
-            this.updateEntity(child, deltaTime);
+            this.updateEntity(child, context);
         }
     }
 
