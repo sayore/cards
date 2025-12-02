@@ -2,6 +2,7 @@
 
 import { IEntity, Position, MouseEvent } from './IEntity';
 import { Draw } from './Draw';
+import { AABB } from './collision/PrimitiveChecks';
 
 export class Entity implements IEntity {
     public kind = "BaseEntity";
@@ -33,6 +34,7 @@ export class Entity implements IEntity {
         this.parent = null;
         this.debugConnectToParent = false; // Disabled by default
     }
+  
 
     // IEntity methods
     update(deltaTime: number): void {

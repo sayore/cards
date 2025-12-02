@@ -1,5 +1,6 @@
 // IEntity.ts - Interface for game entities
 
+import { AABB } from './collision/PrimitiveChecks';
 import { Draw } from './Draw';
 
 // Position interface

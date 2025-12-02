@@ -4,12 +4,14 @@ import { WebGLRenderer } from './WebGL';
 import { Draw } from './Draw';
 import { GameLoop } from './GameLoop';
 import { SceneManager, SceneType } from './SceneManager';
+import { PhysicsSystem } from './collision/CollisionSystem';
 
 export class Game {
     private renderer: WebGLRenderer;
     private draw: Draw;
     private gameLoop: GameLoop;
     private sceneManager: SceneManager;
+    private phisicsSystem: PhysicsSystem;
 
     constructor(containerId: string = 'game', width: number = 800, height: number = 600) {
         // Initialize renderer and drawing system
@@ -22,6 +24,8 @@ export class Game {
 
         // Load the simple test scene first
         this.sceneManager.loadScene('simple');
+
+        this.phisicsSystem = new PhysicsSystem({minX:0,minY:0,maxX:width,maxY:height});
 
         // Set up event listeners
         this.setupEventListeners();
